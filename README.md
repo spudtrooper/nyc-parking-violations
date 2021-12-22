@@ -10,10 +10,10 @@ Install
 go install github.com/spudtrooper/nyc-parking-violations
 ```
 
-then
+then, e.g. if license plate `ABCDEFG` owed $1234.56:
 
 ```bash
-nyc-parking-violations --plate <LICENSE PLATE>
+~/go/bin/nyc-parking-violations --plate ABCDEFG
 
-$1234.00
+$1234.56
 ```
