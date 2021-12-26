@@ -3,7 +3,6 @@ package main
 import (
 	"flag"
 	"fmt"
-	"regexp"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -15,9 +14,6 @@ var (
 	plate  = flag.String("plate", "", "Plate number")
 	plates = flag.String("plates", "", "Comma-separated list of plate numbers")
 	state  = flag.String("state", "NY", "State of the plate")
-
-	// value="65.00" step="0.01"
-	amountRE = regexp.MustCompile(`value="(\d+)\.(\d{2})" step="0.01"`)
 )
 
 func realMain() error {
