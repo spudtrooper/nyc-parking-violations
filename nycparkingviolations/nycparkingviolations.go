@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"regexp"
 	"strconv"
+	"sync"
 )
 
 var (
@@ -14,7 +15,35 @@ var (
 	amountRE = regexp.MustCompile(`value="(\d+)\.(\d{2})" step="0.01"`)
 )
 
+type Result struct {
+	Plate string
+	Total float64
+}
+
+func FindTotalOwedBatch(state string, in chan string, out chan Result, errs chan error) {
+	var wg sync.WaitGroup
+	for i := 0; i < 50; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for plate := range in {
+				total, err := findTotalOwed(plate, state)
+				if err != nil {
+					errs <- err
+				} else {
+					out <- Result{Plate: plate, Total: total}
+				}
+			}
+		}()
+	}
+	wg.Wait()
+}
+
 func FindTotalOwed(plate, state string) (float64, error) {
+	return findTotalOwed(plate, state)
+}
+
+func findTotalOwed(plate, state string) (float64, error) {
 	if state == "" {
 		state = "NY"
 	}
