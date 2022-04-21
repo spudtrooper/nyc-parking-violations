@@ -9,7 +9,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/spudtrooper/goutil/check"
-	"github.com/spudtrooper/nyc-parking-violations/nycparkingviolations"
+	"github.com/spudtrooper/nyc-parking-violations/find"
 )
 
 var (
@@ -24,14 +24,14 @@ func realMain() error {
 		return errors.Errorf("--plate or --plates or --plates_file required")
 	}
 	if *plate != "" {
-		total, err := nycparkingviolations.FindTotalOwed(*plate, *state)
+		total, err := find.FindTotalOwed(*plate, *state)
 		if err != nil {
 			return err
 		}
 		fmt.Printf("$%0.2f\n", total)
 	} else if *platesFile != "" {
 		plates := make(chan string)
-		results := make(chan nycparkingviolations.Result)
+		results := make(chan find.Result)
 		errs := make(chan error)
 
 		f, err := os.Open(*platesFile)
@@ -51,7 +51,7 @@ func realMain() error {
 		}()
 
 		go func() {
-			nycparkingviolations.FindTotalOwedBatch(*state, plates, results, errs)
+			find.FindTotalOwedBatch(*state, plates, results, errs)
 			close(results)
 			close(errs)
 		}()
@@ -62,7 +62,7 @@ func realMain() error {
 	} else {
 		for _, plate := range strings.Split(*plates, ",") {
 			plate = strings.TrimSpace(plate)
-			total, err := nycparkingviolations.FindTotalOwed(plate, *state)
+			total, err := find.FindTotalOwed(plate, *state)
 			if err != nil {
 				return err
 			}
