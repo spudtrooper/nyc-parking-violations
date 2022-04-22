@@ -1,0 +1,16 @@
+
+use('nycparkingviolations');
+
+res = db.plates.aggregate([
+    { $project: {
+        _id: 0,
+        plate: "$plate.value",
+        totalowed: "$result.totalowed",
+    } },
+    { $match: { totalowed: { $gt: 0 } } },
+    { $sort: { totalowed: -1 } },
+]).toArray();
+
+db.converttocsv.drop();
+db.createCollection('converttocsv');
+db.converttocsv.insertMany(res);

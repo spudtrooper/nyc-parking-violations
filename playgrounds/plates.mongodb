@@ -1,0 +1,12 @@
+
+use('nycparkingviolations');
+
+db.plates.aggregate([
+    { $project: {
+        _id: 0,
+        plate: "$plate.value",
+        totalowed: "$result.totalowed",
+    } },
+    { $match: { totalowed: { $gt: 0 } } },
+    { $sort: { totalowed: -1 } },    
+]);
