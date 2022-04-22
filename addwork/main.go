@@ -3,18 +3,21 @@ package addwork
 import (
 	"context"
 	"flag"
-	"log"
+	"strings"
 	"sync"
 	"unicode"
 
 	"github.com/spudtrooper/goutil/check"
+	"github.com/spudtrooper/goutil/must"
 	"github.com/spudtrooper/nyc-parking-violations/db"
 )
 
 var (
-	start = flag.String("start", "", "start string")
-	end   = flag.String("end", "", "end string")
-	state = flag.String("state", "NY", "plate state")
+	start      = flag.String("start", "", "start string")
+	end        = flag.String("end", "", "end string")
+	state      = flag.String("state", "NY", "plate state")
+	platesFile = flag.String("plates_file", "", "CVS containing one plate value per line")
+	threads    = flag.Int("threads", 20, "number of threads")
 )
 
 type strRange struct {
@@ -76,9 +79,30 @@ func createStrings() chan string {
 }
 
 func Main(ctx context.Context) {
-	db, err := db.MakeDB(ctx)
-	log.Printf("db: %v", db)
+	d, err := db.MakeDB(ctx)
 	check.Err(err)
+
+	if *platesFile != "" {
+		platesCh := make(chan string)
+		go func() {
+			for _, plate := range must.ReadLines(*platesFile) {
+				platesCh <- strings.TrimSpace(plate)
+			}
+			close(platesCh)
+		}()
+		var wg sync.WaitGroup
+		for i := 0; i < *threads; i++ {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				for plate := range platesCh {
+					check.Err(d.AddWork(ctx, plate, *state))
+				}
+			}()
+		}
+		wg.Wait()
+		return
+	}
 
 	var wg sync.WaitGroup
 	wg.Add(1)
@@ -86,7 +110,7 @@ func Main(ctx context.Context) {
 		defer wg.Done()
 		strs := createStrings()
 		for s := range strs {
-			err := db.AddWork(ctx, s, *state)
+			err := d.AddWork(ctx, s, *state)
 			check.Err(err)
 		}
 	}()
