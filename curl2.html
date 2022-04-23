@@ -1,0 +1,446 @@
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<html>
+  <head>
+	<title>Select Items</title>
+	<meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+	<link href="nycserv.css" rel="stylesheet" type="text/css">
+	<script src="scripts/navigation.js" language="Javascript"></script>
+	<script src="Jscripts/Calci.js" language="Javascript"></script>
+	<script src="Jscripts/PVO_Violations.js" language="Javascript"></script>
+	<script src="scripts/protocol.js" language="Javascript"></script>
+   	<script src="scripts/common.js" language="Javascript"></script>
+   	<script src="scripts/InternetExplorer4_0.js" language="Javascript"></script>
+   	<script src="scripts/CurrentYear.js" language="Javascript"></script>
+	<script src="scripts/AcceptPayment.js" language="Javascript"></script>
+	
+   	
+   	
+  </head>
+<body bgcolor="#FFFFFF" alink="#0000FF" vlink="#800080"
+	onload="
+		
+		showMessage();">
+<a name="top">
+<center>
+<!-----------------------------------Table #1----------------------------------------------------->
+
+
+
+   <table width="610" border="0" cellpadding="0" cellspacing="0">
+   
+   <tr>
+    <td height="36"><a href="javascript:goToHomePage()"><img src="NYCServ_images/top_bar.gif" width="610" height="16" border="0" alt="Back to NYCServ"></a></td>
+</tr>
+
+	<tr>
+	    <td class="depname" height="23"><span class="depname">Parking / Camera Violations</span>
+	    	<span class="deploc">|
+		View Items
+
+		
+
+		
+		</span>
+	   </td>
+	</tr>
+	<tr>  <!--row for spacing-->
+	    <td height="13"><img src="NYCServ_images/spacer.gif" width="1" height="1" border="0" ></td>
+	</tr>
+   </table>
+
+
+    <script src="scripts/NYPD_Tow_detail.js" language="Javascript"></script>
+    <script src="scripts/PaymentCenters.js" language="Javascript"></script>
+    <table width="610" border="0" cellspacing="0" cellpadding="0">
+    <tr>
+    <td class="instructions">
+
+    <table border="0" cellpadding="0" cellspacing="0">
+
+    <tr>
+      <td width="8"><img src="NYCServ_images/spacer.gif" width="1" height="1" border="0"></td>
+      <td class="instructions">
+     
+      	 
+     	This list contains unpaid violations for license plates associated with you.
+
+        
+           <br>
+                         <!--<br><br>-->
+	    Click <img src="NYCServ_images/details.gif" align="middle" border="0" alt="Detail Icon"> below to display
+            additional information on the violation. <span class="formText"> (A new window will open.) </span>
+	    <Br><Br>
+ 	    Click <img src="NYCServ_images/get_image_notext.gif" align="middle" border="0" alt="Get Image Icon"> below to display
+            the image of the issued parking ticket.(If you want to view your Notice of Liability or need a copy, you need to <b><a href="http://www1.nyc.gov/site/finance/about/contact-by-email/contact-general-correspondence.page" >contact us</a></b>; NOL copies are not available online.) <span class="formText"> (A new window will open.) </span><br>
+ 		    
+		    <Br>
+		    <span class="formText"><img src="NYCServ_images/pdficonsmall.gif" alt="Get Adobe PDF Reader" width="15" height="15" border="0" >
+		    &nbsp;<a href="http://www.adobe.com/products/acrobat/readstep2.html" >Adobe&nbsp;Acrobat&nbsp;Reader</a>
+		    (required to view images)</span>
+	    
+        
+      </td>
+      <td width="8"><img src="NYCServ_images/spacer.gif" width="1" height="1" border="0" ></td>
+    </tr>
+    </table>
+    </td>
+</tr>
+<tr>
+      <td height="15"><img src="NYCServ_images/spacer.gif" width="1" height="1" border="0" ></td>
+</tr>
+
+
+
+</table>  <!----end of table #2--->
+
+
+
+<!--Form for the Outstanding Parking Tickets Table-->
+<form NAME="NycservProtocolForm" METHOD=POST action="NYCSERVMain">
+
+
+
+
+<!----------------------------Table #4, Oustanding Parking Tickets table  ---------------->
+
+<script src="scripts/violation_details.js" language="Javascript"></script>
+<script src="scripts/Vio_Image.js" language="Javascript"></script>
+
+
+<table width="610" border="0" cellspacing="1" cellpadding="0"> <!--Nested Table 2.3-->
+ 	 <tr>
+	    <td height="15" bgcolor="#83b583"><img src="NYCServ_images/spacer.gif" width="1" height="1" border="0" >
+	    </td>
+	    <!--end of the towing table light blue bar-->
+    </tr>
+ </table>
+
+<table width="610" border="0" cellspacing="0" cellpadding="0">
+<tr>
+   <td height="25">
+   <table width="610" border="0" cellspacing="1"> <!--Nested Table 4.1-->
+     <tr>
+            <!--XXXXX = Day, MMMM = Month, DD = Date, YYYY = Year-->
+            <td class="headerBlue" height="23">&nbsp;Outstanding Violations as of
+               Saturday, Apr 23, 2022 09:26 AM
+            </td>
+     </tr>
+   </table>  <!--end of nested table 4.1-->
+   </td>
+</tr>
+<!-- NBP Added checkbox to select all items   -->
+
+
+<tr>
+     <td>
+     <table width="610" border="0" cellspacing="1" cellpadding="0"> <!--Nested Table 4.2-->
+     <tr bgcolor="#336633">
+          <td width="10"><img src="NYCServ_images/spacer.gif" width="1" height="1" border="0" ></td>
+
+	
+	 <td width="68" class="tableHeader" height="21" align="center">Plate</td>
+	 <td width="81" class="tableHeader" height="21" align="center">Violation</td>
+	 <td width="74" class="tableHeader" height="21" align="center">Issued On</td>
+	 <td width="170" class="tableHeader" height="21" align="center">Description</td>
+	 <td width="40" class="tableHeader" height="21" align="center">Details</td>
+	 <td width="40" class="tableHeader" height="21" align="center">Image</td>
+	 <td width="49" class="tableHeader" height="21" align="center">Amount Due</td>
+	
+    </tr>
+    
+    
+    
+    
+    
+     
+    
+    
+     
+    <tr class="cellWhite" >
+	 <td align="center" class="cellWhite" width="10">1</td>
+  	
+
+	
+	
+	
+	<td class="cellWhite" width="68">&nbsp;&nbsp;
+	   		T753230C
+	</td>
+	
+	
+	
+	<td align="center" class="cellWhite"  width="81">&nbsp;
+	
+                1479244417
+	
+	
+	</td>
+	
+	
+	
+	
+	<td class="cellWhite" width="74">&nbsp;
+	             01/15/2021
+	</td>
+
+	
+	
+	
+	<td class="cellWhite" width="170">
+	             INSP. STICKER-EXPIRED/MISSING&nbsp;
+	</td>
+	   
+	
+	
+	
+	<td class="cellWhite" width="40" align="center">
+	    	<a href="javascript:browserpopup(
+			    'T753230C',
+			    'Passenger',
+			    'New York',
+			    '',
+			    '1479244417',
+			    '01/15/21 08:37 AM',
+			    'INSP. STICKER-EXPIRED/MISSING',
+			    '71',
+			    '65.00',
+			    '0.00',
+			    '0.00',
+			    '0.00',
+			    '0.00',
+			    '65.00',
+			    '',
+			    '',
+			    'Ticket is past due.',
+			    'false',
+			    'In front of',
+			    '25-49 44 DR',
+			    'Queens',
+			    'true',
+			    'Saturday, Apr 23, 2022 09:26 AM', 
+				'false',
+				'',
+				'null')">
+			<img src="NYCServ_images/details.gif" alt="Ticket Detail" align="middle" border="0">
+		</a>
+	</td>
+	
+	
+	
+	<td class="cellWhite" width="40" align="center">
+	
+	   
+		<a href="javascript:ImagePopUpPdf('1479244417','NYCSERVMain','01/15/2021')"/>
+	   
+		<img src="NYCServ_images/get_image_notext.gif" alt="Ticket Image" align="middle" border="0">
+		</a>
+	
+	</td>
+	
+	
+	
+	   
+	<td align="right" class="cellWhite" width="49">65.00</td>
+	
+	</tr>
+    
+   
+
+     </table> <!--end of nested table 4.2-->
+   </td>
+</tr>
+
+
+
+   			       
+<tr>
+    <td>
+	<table width="610" border="0" cellspacing="0" cellpadding="0"> <!--Nested Table 4.3-->
+        <tr bgcolor="green">
+	
+		<td width="68"  class="tableHeader" height="21" align="center"><img src="NYCServ_images/spacer.gif" width="1" height="1" border="0" ></td>
+		<td width="78"  class="tableHeader" height="21" align="center"><img src="NYCServ_images/spacer.gif" width="1" height="1" border="0" ></td>
+		<td width="83"  class="tableHeader" height="21" align="center"><img src="NYCServ_images/spacer.gif" width="1" height="1" border="0" ></td>
+		<td width="170" class="tableHeader" height="21" align="center"><img src="NYCServ_images/spacer.gif" width="1" height="1" border="0" ></td>
+		<td width="32"  class="tableHeader" height="21" align="center"><img src="NYCServ_images/spacer.gif" width="1" height="1" border="0" ></td>
+		<td width="60"  class="tableHeader" height="21" align="right">&nbsp;&nbsp;Total Due</td>
+	
+	</tr>
+	</table> <!--end of nested table 4.3-->
+   </td>
+</tr>
+<tr>
+    <td>
+	<table width="610" border="0" cellspacing="1" cellpadding="0"> <!--Nested Table 4.4-->
+      	<tr>
+		<td width="310" class="totalText"><img src="NYCServ_images/spacer.gif" width="1" height="12" border="0" ></td>
+		<td width="240" class="totalText" align="center"></td>
+         	<td width="60" align="right" class="totalText">$65.00</td>
+		
+	</tr>
+	<tr>
+        	<td height="5"><img src="NYCServ_images/spacer.gif" width="1" height="1" border="0" ></td>
+	</tr>
+	</table> <!--end of nested table 4.4-->
+   </td>
+</tr>
+
+
+
+
+  
+<tr>
+    <td>
+	<table width="610" border="0" cellspacing="0" cellpadding="0"> <!--Nested Table 4.5-->
+	<tr>
+         	<td width="8" bgcolor="#ccffcc"> <img src="NYCServ_images/spacer.gif" width="1" height="1" border="0" ></td>
+	     	<td height="30" bgcolor="#ccffcc" class="shortinstructions"><div align="justify">
+	 	 
+	 	
+
+	            Items and amounts might not reflect recent payments made or violations issued in the last 4 weeks. To find a specific violation, search using the ticket or Notice of Liability number.</div>
+	        </td>
+         	<td width="8" bgcolor="#ccffcc"><img src="NYCServ_images/spacer.gif" width="1" height="5" border="0" ></td>
+	</tr>
+	</table> <!--end of nested table 4.5-->
+   </td>
+</tr>
+
+
+
+   	
+
+    
+    
+
+
+   
+
+<tr>
+    <td>
+      <table width="610" border="0" cellspacing="0" cellpadding="0"> <!--Nested Table 4.5-->
+      <tr>
+         <td width="8" bgcolor="#ccffcc">
+              <img src="NYCServ_images/spacer.gif" width="1" height="1" border="0" >
+         </td>
+	     <td height="30" bgcolor="#ccffcc" class="shortinstructions"><div align="justify">
+	         <br>To pay now, copy the Plate, State, Violation Number, and Amount Due for each ticket and locate your ticket at our
+			<a href="http://www1.nyc.gov/assets/finance/jump/pay_parking_camera_violations.html"> Pay Parking Ticket </a> site.</div>
+	     </td>
+         <td width="8" bgcolor="#ccffcc">
+              <img src="NYCServ_images/spacer.gif" width="1" height="1" border="0" >
+         </td>
+	  </tr>
+      </table> <!--end of nested table 4.5-->
+   </td>
+ </tr>
+
+</table> <!--end of table #4-->
+
+
+
+ <span class="cellLightBlue"></span><span class="cellLightBlue"></span>
+
+
+
+   
+<table width="610" border="0" cellspacing="1">
+<tr>
+     
+     <td width="510" height="24" align="right"> &nbsp;
+     </td>
+     <td width="91" height="24" align="right">
+     	<a href="javascript:goToHomePage()">
+     		<img src="NYCServ_images/Cancel_button.gif" name="Cancel" value="Cancel"  border="0" alt="Cancel" align="top">
+     	</a>
+     </td>
+     <td width="91" height="24" align="right">
+	<a href="javascript:PVO_Violation_Search()">
+	 	<img src="NYCServ_images/newsearch_blue.gif" name="New Search" value="New Search" border="0" alt="New Search" align="top">
+	</a>     
+     </td>
+     
+</tr>
+</table> 
+<INPUT TYPE=HIDDEN NAME=ChannelType VALUE=ct/Browser>
+<INPUT TYPE=HIDDEN NAME=RequestType VALUE=rt/Business>
+<INPUT TYPE=HIDDEN NAME=SubSystemType VALUE=st/Payments>
+<INPUT TYPE=HIDDEN NAME=AgencyType VALUE=at/PVO>
+<INPUT TYPE=HIDDEN NAME=ServiceName VALUE=NONE >
+<INPUT TYPE=HIDDEN NAME=MethodName VALUE=NONE >
+<INPUT TYPE=HIDDEN NAME=PageID VALUE=PVO_Violations>
+<INPUT TYPE=HIDDEN NAME=ParamCount VALUE=0 >
+<INPUT TYPE=HIDDEN NAME=NycservRequest VALUE="EMPTY">
+</form> <!-- end of form-->
+<form name = "ErrorForm">
+	
+	<INPUT TYPE=HIDDEN NAME=ErrorMessage VALUE=''>
+	
+</form>
+
+
+
+
+
+<table border="0" width="610" cellpadding="0" cellspacing="0">
+<tr>
+      <td height="10"><img src="NYCServ_images/spacer.gif" width="1" height="1" border="0" alt="spacer"></td>
+</tr>
+
+<tr>
+    <td align="center" class="bottomLink">
+		Go to <!-- <a href="http://www1.nyc.gov/site/finance/index.page" class="bottomLink">Department of Finance</a>&nbsp;|&nbsp; -->
+		<a href="http://www.nyc.gov" class="bottomLink">NYC.gov Home</a>&nbsp;|&nbsp;
+		<a href="http://www1.nyc.gov/site/finance/index.page" class="bottomLink">Finance Home</a>&nbsp;|&nbsp;
+		<a href="http://www.nyc.gov/html/doh/home.html" class="bottomLink">Health</a>&nbsp;|&nbsp;
+		<a href="http://www.nyc.gov/html/dca/home.html" class="bottomLink">Consumer Affairs</a>&nbsp;|&nbsp;
+		<a href="http://www.nyc.gov/html/dep/home.html" class="bottomLink">Environmental Protection</a>&nbsp;|&nbsp;
+		<a href="http://www1.nyc.gov/site/finance/about/contact-by-email/contact-technical-property-questions.page" class="bottomLink">Contact Us</a>&nbsp;|&nbsp;
+		<a href="http://www.nyc.gov/faqs" class="bottomLink">FAQs</a>&nbsp;|&nbsp;
+		<a href="http://www.nyc.gov/privacy" class="bottomLink">Privacy Statement</a>&nbsp;|&nbsp;
+		<a href="http://www.nyc.gov/sitemap" class="bottomLink">Site Map</a>&nbsp;|&nbsp;
+		<a href="http://www.nyc.gov/Search/home.html" class="bottomLink">Search</a>
+	</td>
+</tr>
+
+<tr>
+    <td height="20"><img src="NYCServ_images/spacer.gif" width="1" height="1" border="0" alt="spacer"></td>
+</tr>
+
+<tr>
+    <td align="center" class="footer">Copyright &copy;<script>document.write(getCopyRightYear())</script> New York City D.O.F. All rights reserved.<!-- <a href="#" class="footer">Privacy Policy</a>&nbsp;-&nbsp; <a href="#" class="footer">Terms of Service</a> &nbsp;-&nbsp;<a href="http://nyc.gov/html/dof/html/faq.html" class="footer">Help</a>-->&nbsp;-&nbsp;<a href="javascript:gotoContactUspage()" class="footer">Contact NYCServ</a><SPAN class="small">&nbsp;(A new window will open).</SPAN></td>
+</tr>
+
+</table> <!-- end of table #4, footer table-->
+</center>
+</body>
+</html>
+
+
+
+
+
+
+

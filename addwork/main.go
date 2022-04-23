@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/csv"
 	"flag"
+	"fmt"
 	"io"
 	"os"
 	"sync"
@@ -11,6 +12,7 @@ import (
 	"time"
 	"unicode"
 
+	"github.com/fatih/color"
 	"github.com/spudtrooper/goutil/check"
 	goutillog "github.com/spudtrooper/goutil/log"
 	"github.com/spudtrooper/nyc-parking-violations/db"
@@ -28,7 +30,7 @@ var (
 	dryRun             = flag.Bool("dry_run", false, "just print what we would do")
 )
 
-var log = goutillog.MakeLog("plates", goutillog.MakeLogColor(true))
+var log = goutillog.MakeLog("add-work", goutillog.MakeLogColor(true))
 
 type strRange struct {
 	from, to rune
@@ -119,11 +121,22 @@ func addFromFile(ctx context.Context, d *db.DB, f string, colIndex int, skipFirs
 	go func() {
 		defer wg.Done()
 		start := time.Now()
+		var lastAdded, lastExisted int64
 		for {
-			time.Sleep(3 * time.Second)
+			time.Sleep(1 * time.Second)
 			elapsed := time.Since(start)
 			rate := float64(added+existed) / float64(elapsed.Milliseconds()/1000)
-			log.Printf("[add work] elapsed: %v, added: %d, existed: %d rate: %0.1f/s", elapsed, added, existed, rate)
+			diffAdded := added - lastAdded
+			diffExisted := existed - lastExisted
+			log.Printf("elapsed: %s | added: %5d (+%s) | existed: %5d (+%s) | rate: %0.1f/s",
+				color.GreenString(fmt.Sprintf("%15v", elapsed)),
+				added,
+				color.HiGreenString(fmt.Sprintf("%5d", diffAdded)),
+				existed,
+				color.HiGreenString(fmt.Sprintf("%5d", diffExisted)),
+				rate)
+			lastAdded = added
+			lastExisted = existed
 			if done > 0 {
 				break
 			}
