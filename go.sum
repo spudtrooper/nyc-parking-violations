@@ -59,10 +59,6 @@ github.com/pkg/errors v0.9.1/go.mod h1:bwawxfHBFNV+L2hUp1rHADufV3IMtnDRdf1r5NINE
 github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZbAQM=
 github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
 github.com/rivo/duplo v0.0.0-20180323201418-c4ec823d58cd/go.mod h1:gw8DEItjXFxacZzluOv7azm5G22Vvx/OBZb7Wqoqp9M=
-github.com/spudtrooper/goutil v0.1.46/go.mod h1:ze9pOdJ+H0tlBjiPC84xY7U0gjEveEn5i/qDX3iGbio=
-github.com/spudtrooper/goutil v0.1.67/go.mod h1:SPkYuCyWngjiYKurx7OJ+BpnZv5m23uD0PPVKzLEvRQ=
-github.com/spudtrooper/goutil v0.1.79 h1:2agzjCxj0hqCF2OH/qkOxU1NprhDUtnrHMmQZJMCRRs=
-github.com/spudtrooper/goutil v0.1.79/go.mod h1:Ke5IZeTPuRjakBoUWuYcxaJjTXpMIFy/MsEgc0JKLr0=
 github.com/spudtrooper/jsontogo v0.0.0-20220310212318-5dc9d8f01875/go.mod h1:nBM+kIGhOEdpfDDbS3y+6ga4tAqYVoiW/F5UiM3vWD0=
 github.com/spudtrooper/minimalcli v0.0.0-20220218140555-74daced67dea/go.mod h1:WRwW9Arj7MSQBWfAalqJAJcY29RJ9mefQ5B91GJWFVc=
 github.com/stretchr/objx v0.1.0/go.mod h1:HFkY916IF+rwdDfMAkV7OtwuqBVzrE8GR6GFx+wExME=

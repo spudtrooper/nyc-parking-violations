@@ -12,4 +12,4 @@ out=data/platessorted.csv
 cat playgrounds/convert_to_csv.mongodb | sed 's#use(#//use(#g' > tmp/scripts/convert_to_csv.js
 mongo mongodb://localhost:27017/nycparkingviolations tmp/scripts/convert_to_csv.js
 mongoexport --db=nycparkingviolations --collection=converttocsv --type=csv --fields=$fields > $out
-echo "Written to $out"
+echo "Written to $out $(wc -l $out | awk '{print $1}' | sed 's/ //g') lines"

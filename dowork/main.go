@@ -96,23 +96,11 @@ func processPlates(ctx context.Context, d *db.DB, plates []string) {
 	wg.Wait()
 }
 
-func Main(ctx context.Context) {
-	d, err := db.MakeDB(ctx)
-	check.Err(err)
-
-	if *plates != "" {
-		processPlates(ctx, d, slice.Strings(*plates, ","))
-		return
-	}
-
-	if *platesFile != "" {
-		processPlates(ctx, d, must.ReadLines(*platesFile))
-		return
-	}
-
+func processPlatesFromDB(ctx context.Context, d *db.DB) {
 	var wg sync.WaitGroup
 	q := makeWorkQueue(d)
 	for i := 0; i < *threads; i++ {
+		i := i
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
@@ -124,10 +112,7 @@ func Main(ctx context.Context) {
 					continue
 				}
 				if !ok {
-					log.Printf("we're done")
-					s, err := d.DebugString(ctx)
-					check.Err(err)
-					log.Println("\n" + s)
+					log.Printf("thread #%d done", i)
 					break
 				}
 				total, err := find.FindTotalOwed(plate, *state)
@@ -149,4 +134,21 @@ func Main(ctx context.Context) {
 		}()
 	}
 	wg.Wait()
+}
+
+func Main(ctx context.Context) {
+	d, err := db.MakeDB(ctx)
+	check.Err(err)
+
+	if *plates != "" {
+		processPlates(ctx, d, slice.Strings(*plates, ","))
+		return
+	}
+
+	if *platesFile != "" {
+		processPlates(ctx, d, must.ReadLines(*platesFile))
+		return
+	}
+
+	processPlatesFromDB(ctx, d)
 }

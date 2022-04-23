@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
@@ -39,12 +40,16 @@ func isNoDocs(err error) bool {
 	return strings.Contains(err.Error(), "no documents in result")
 }
 
+func (d *DB) plates() *mongo.Collection {
+	return d.collection("plates")
+}
+
 func (d *DB) DebugString(ctx context.Context) (string, error) {
 	var buf bytes.Buffer
 
 	{
 		filter := bson.D{{"result.state", ResultsStateUnset}}
-		cnt, err := d.collection("plates").CountDocuments(ctx, filter)
+		cnt, err := d.plates().CountDocuments(ctx, filter)
 		if err != nil {
 			return "", err
 		}
@@ -52,7 +57,7 @@ func (d *DB) DebugString(ctx context.Context) (string, error) {
 	}
 	{
 		filter := bson.D{{"result.state", ResultStateDone}}
-		cnt, err := d.collection("plates").CountDocuments(ctx, filter)
+		cnt, err := d.plates().CountDocuments(ctx, filter)
 		if err != nil {
 			return "", err
 		}
@@ -60,7 +65,7 @@ func (d *DB) DebugString(ctx context.Context) (string, error) {
 	}
 	{
 		filter := bson.D{{"result.state", ResultStateError}}
-		cnt, err := d.collection("plates").CountDocuments(ctx, filter)
+		cnt, err := d.plates().CountDocuments(ctx, filter)
 		if err != nil {
 			return "", err
 		}
@@ -72,7 +77,7 @@ func (d *DB) DebugString(ctx context.Context) (string, error) {
 
 func (d *DB) CleanUp(ctx context.Context) error {
 	filter := bson.D{{"plate.value", "0"}}
-	res, err := d.collection("plates").DeleteMany(ctx, filter)
+	res, err := d.plates().DeleteMany(ctx, filter)
 	if err != nil {
 		return err
 	}
@@ -82,13 +87,16 @@ func (d *DB) CleanUp(ctx context.Context) error {
 	return nil
 }
 
-func (d *DB) AddWork(ctx context.Context, plateValue, state string) error {
+func (d *DB) AddWork(ctx context.Context, plateValue, state string) (bool, error) {
 	filter := bson.D{{"plate.value", plateValue}, {"plate.state", state}}
-	res := d.collection("plates").FindOne(ctx, filter)
+	res := d.plates().FindOne(ctx, filter)
 	if res.Err() != nil {
 		if !isNoDocs(res.Err()) {
-			return res.Err()
+			return false, res.Err()
 		}
+	} else {
+		// exists already
+		return true, nil
 	}
 
 	stored := storedPlate{
@@ -101,11 +109,11 @@ func (d *DB) AddWork(ctx context.Context, plateValue, state string) error {
 		},
 	}
 
-	if _, err := d.collection("plates").InsertOne(ctx, stored); err != nil {
-		return err
+	if _, err := d.plates().InsertOne(ctx, stored); err != nil {
+		return false, err
 	}
 
-	return nil
+	return false, nil
 }
 
 func (d *DB) GetWork(ctx context.Context, state string, num int) ([]string, bool, error) {
@@ -114,7 +122,7 @@ func (d *DB) GetWork(ctx context.Context, state string, num int) ([]string, bool
 	opts := &options.FindOptions{
 		Limit: &limit,
 	}
-	res, err := d.collection("plates").Find(ctx, filter, opts)
+	res, err := d.plates().Find(ctx, filter, opts)
 	if err != nil {
 		return nil, false, err
 	}
@@ -149,7 +157,7 @@ func (d *DB) Update(ctx context.Context, plateValue, state string, resultState r
 			{"result", result},
 		}},
 	}
-	if _, err := d.collection("plates").UpdateOne(ctx, filter, update); err != nil {
+	if _, err := d.plates().UpdateOne(ctx, filter, update); err != nil {
 		return err
 	}
 	return nil
