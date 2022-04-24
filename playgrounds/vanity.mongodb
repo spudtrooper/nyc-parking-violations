@@ -1,0 +1,26 @@
+
+use('nycparkingviolations');
+
+db.plates.aggregate([
+    { $project: {
+        _id: 0,
+        plate: "$plate.value",
+        totalowed: "$result.totalowed",
+        tag: "$tag",
+    } },
+    { $match: { tag: { $eq: "vanity" } } },
+    { $match: { totalowed: { $gt: 0 } } },
+    { $sort: { totalowed: -1 } },    
+]);
+
+db.plates.aggregate([
+    { $project: {
+        _id: 0,
+        plate: "$plate.value",
+        totalowed: "$result.totalowed",
+        tag: "$tag",
+    } },
+    { $match: { tag: { $eq: "vanity" } } },
+    { $match: { totalowed: { $eq: 0 } } },
+    { $sort: { totalowed: -1 } },    
+]);

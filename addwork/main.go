@@ -28,6 +28,8 @@ var (
 	plateCSVSkipFirst  = flag.Bool("plates_csv_skip_first", false, "skip the first line in the CSV file")
 	threads            = flag.Int("threads", 20, "number of threads")
 	dryRun             = flag.Bool("dry_run", false, "just print what we would do")
+	tag                = flag.String("tag", "", "extra tag to add to the entry")
+	txSize             = flag.Int("tx_size", 0, "# of updates per transaction, if zero we don't use the batch adder")
 )
 
 var log = goutillog.MakeLog("add-work", goutillog.MakeLogColor(true))
@@ -68,7 +70,85 @@ func addToStrings(i int, rngs []*strRange, buf []rune, ch *chan string) {
 	}
 }
 
+type transactionAdder struct {
+	d               *db.DB
+	mu              sync.Mutex
+	adds            []db.Add
+	transactionSize int
+}
+
+func makeTransactionAdder(d *db.DB) *transactionAdder {
+	return &transactionAdder{
+		d:               d,
+		transactionSize: *txSize,
+	}
+}
+
+func (t *transactionAdder) Add(ctx context.Context, plate, state, tag string) {
+	add := db.Add{
+		Plate: plate,
+		State: state,
+		Tag:   tag,
+	}
+	t.mu.Lock()
+	t.adds = append(t.adds, add)
+
+	var adds []db.Add
+	if len(t.adds) == t.transactionSize {
+		adds = t.adds[:]
+		t.adds = []db.Add{}
+	}
+	t.mu.Unlock()
+
+	if len(adds) > 0 {
+		t.flush(ctx, adds)
+	}
+}
+
+func (t *transactionAdder) Flush(ctx context.Context) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.flush(ctx, t.adds)
+}
+
+func (t *transactionAdder) flush(ctx context.Context, adds []db.Add) {
+	if err := t.d.AddWorkMany(ctx, adds); err != nil {
+		log.Printf("error: %v", err)
+	}
+}
+
+func addFromFileBatched(ctx context.Context, d *db.DB, f string, colIndex int, skipFirst bool) {
+	t := makeTransactionAdder(d)
+	addFromFileGeneric(ctx, d, f, colIndex, skipFirst,
+		func(ctx context.Context, plate, state, tag string, existed, added *int64) {
+			t.Add(ctx, plate, state, tag)
+			atomic.AddInt64(added, 1)
+		},
+		func(ctx context.Context) {
+			t.Flush(ctx)
+		},
+	)
+}
+
 func addFromFile(ctx context.Context, d *db.DB, f string, colIndex int, skipFirst bool) {
+	addFromFileGeneric(ctx, d, f, colIndex, skipFirst,
+		func(ctx context.Context, plate, state, tag string, existed, added *int64) {
+			exists, err := d.AddWork(ctx, plate, state, tag)
+			check.Err(err)
+			if exists {
+				atomic.AddInt64(existed, 1)
+			} else {
+				atomic.AddInt64(added, 1)
+			}
+		},
+		func(ctx context.Context) {
+			// nothing
+		},
+	)
+}
+
+func addFromFileGeneric(ctx context.Context, d *db.DB, f string, colIndex int, skipFirst bool,
+	add func(ctx context.Context, plate, state, tag string, existed, added *int64), flush func(ctx context.Context)) {
 	platesCh := make(chan string)
 	go func() {
 		in, err := os.Open(f)
@@ -104,13 +184,7 @@ func addFromFile(ctx context.Context, d *db.DB, f string, colIndex int, skipFirs
 					log.Printf("add %s:%s", plate, *state)
 					atomic.AddInt64(&added, 1)
 				} else {
-					exists, err := d.AddWork(ctx, plate, *state)
-					check.Err(err)
-					if exists {
-						atomic.AddInt64(&existed, 1)
-					} else {
-						atomic.AddInt64(&added, 1)
-					}
+					add(ctx, plate, *state, *tag, &existed, &added)
 				}
 			}
 			atomic.AddInt32(&done, 1)
@@ -129,7 +203,7 @@ func addFromFile(ctx context.Context, d *db.DB, f string, colIndex int, skipFirs
 			diffAdded := added - lastAdded
 			diffExisted := existed - lastExisted
 			log.Printf("elapsed: %s | added: %5d (+%s) | existed: %5d (+%s) | rate: %0.1f/s",
-				color.GreenString(fmt.Sprintf("%15v", elapsed)),
+				color.GreenString(fmt.Sprintf("%20v", elapsed)),
 				added,
 				color.HiGreenString(fmt.Sprintf("%5d", diffAdded)),
 				existed,
@@ -144,6 +218,8 @@ func addFromFile(ctx context.Context, d *db.DB, f string, colIndex int, skipFirs
 	}()
 
 	wg.Wait()
+
+	flush(ctx)
 }
 
 func createStrings() chan string {
@@ -175,7 +251,7 @@ func addFromFlags(ctx context.Context, d *db.DB) {
 		defer wg.Done()
 		strs := createStrings()
 		for s := range strs {
-			_, err := d.AddWork(ctx, s, *state)
+			_, err := d.AddWork(ctx, s, *state, *tag)
 			check.Err(err)
 		}
 	}()
@@ -183,17 +259,25 @@ func addFromFlags(ctx context.Context, d *db.DB) {
 }
 
 func Main(ctx context.Context) {
-	d, err := db.MakeDB(ctx)
+	d, err := db.MakeFromFlags(ctx)
 	check.Err(err)
 
 	if *platesFile != "" {
-		addFromFile(ctx, d, *platesFile, 0, false)
+		if *txSize > 0 {
+			addFromFileBatched(ctx, d, *platesFile, 0, false)
+		} else {
+			addFromFile(ctx, d, *platesFile, 0, false)
+		}
 		return
 	}
 
 	if *plateCSVFile != "" {
 		check.Check(*plateCSVFileColumn != -1)
-		addFromFile(ctx, d, *plateCSVFile, *plateCSVFileColumn, *plateCSVSkipFirst)
+		if *txSize > 0 {
+			addFromFileBatched(ctx, d, *plateCSVFile, *plateCSVFileColumn, *plateCSVSkipFirst)
+		} else {
+			addFromFile(ctx, d, *plateCSVFile, *plateCSVFileColumn, *plateCSVSkipFirst)
+		}
 		return
 	}
 

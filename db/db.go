@@ -2,6 +2,7 @@ package db
 
 import (
 	"context"
+	"flag"
 	"fmt"
 	"log"
 
@@ -10,12 +11,21 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
+var (
+	dbPort = flag.Int("db_port", 0, "database port")
+	dbName = flag.String("db_name", "", "database name")
+)
+
 type DB struct {
 	dbName string
 	client *mongo.Client
 }
 
-func MakeDB(ctx context.Context, mOpts ...MakeDBOption) (*DB, error) {
+func MakeFromFlags(ctx context.Context) (*DB, error) {
+	return Make(ctx, MakeDBPort(*dbPort), MakeDBDbName(*dbName))
+}
+
+func Make(ctx context.Context, mOpts ...MakeDBOption) (*DB, error) {
 	opts := MakeMakeDBOptions(mOpts...)
 
 	port := or.Int(opts.Port(), 27017)

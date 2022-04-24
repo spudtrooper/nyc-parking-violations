@@ -20,6 +20,7 @@ var (
 	state      = flag.String("state", "NY", "plate state")
 	plates     = flag.String("plates", "", "comma-delimited list of plates to look up")
 	platesFile = flag.String("plates_file", "", "CVS containing one plate value per line")
+	txSize     = flag.Int("tx_size", 0, "# of updates per transaction, if zero we don't use the batch updater")
 )
 
 var log = goutillog.MakeLog("plates", goutillog.MakeLogColor(true))
@@ -69,6 +70,7 @@ func processPlates(ctx context.Context, d *db.DB, plates []string) {
 	}()
 	var wg sync.WaitGroup
 	for i := 0; i < *threads; i++ {
+		i := i
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
@@ -81,7 +83,7 @@ func processPlates(ctx context.Context, d *db.DB, plates []string) {
 					}
 					continue
 				}
-				log.Printf("%s -> $%0.2f", plate, total)
+				log.Printf("thread #%3d: %s -> $%0.2f", i, plate, total)
 				if err := d.Update(ctx, plate, *state, db.ResultStateDone, total, ""); err != nil {
 					log.Printf("error: %v", err)
 					continue
@@ -94,6 +96,98 @@ func processPlates(ctx context.Context, d *db.DB, plates []string) {
 		}()
 	}
 	wg.Wait()
+}
+
+type transactionUpdater struct {
+	d               *db.DB
+	mu              sync.Mutex
+	updates         []db.Update
+	transactionSize int
+}
+
+func makeTransactionUpdater(d *db.DB) *transactionUpdater {
+	return &transactionUpdater{
+		d:               d,
+		transactionSize: *txSize,
+	}
+}
+
+func (t *transactionUpdater) Add(ctx context.Context, plate, state string, resultState db.ResultState, total float64, err error) {
+	var e string
+	if err != nil {
+		e = err.Error()
+	}
+	u := db.Update{
+		Plate:       plate,
+		State:       state,
+		ResultState: resultState,
+		Total:       total,
+		Error:       e,
+	}
+	t.mu.Lock()
+	t.updates = append(t.updates, u)
+
+	var updates []db.Update
+	if len(t.updates) == t.transactionSize {
+		updates = t.updates[:]
+		t.updates = []db.Update{}
+	}
+	t.mu.Unlock()
+
+	if len(updates) > 0 {
+		t.flush(ctx, updates)
+	}
+}
+
+func (t *transactionUpdater) Flush(ctx context.Context) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.flush(ctx, t.updates)
+}
+
+func (t *transactionUpdater) flush(ctx context.Context, updates []db.Update) {
+	if err := t.d.UpdateMany(ctx, updates); err != nil {
+		log.Printf("error: %v", err)
+	}
+}
+
+func processPlatesFromDBWithTransactions(ctx context.Context, d *db.DB) {
+	var wg sync.WaitGroup
+	q := makeWorkQueue(d)
+	u := makeTransactionUpdater(d)
+	for i := 0; i < *threads; i++ {
+		i := i
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			done := 0
+			for {
+				plate, ok, err := q.Next(ctx)
+				if err != nil {
+					log.Printf("error: %v", err)
+					continue
+				}
+				if !ok {
+					log.Printf("thread #%d done", i)
+					break
+				}
+				total, err := find.FindTotalOwed(plate, *state)
+				if err != nil {
+					log.Printf("thread #%3d: %s -> $%0.2f error: %v", i, plate, total, err)
+					u.Add(ctx, plate, *state, db.ResultStateError, 0, err)
+					continue
+				}
+				log.Printf("thread #%3d: %s -> $%0.2f", i, plate, total)
+				u.Add(ctx, plate, *state, db.ResultStateDone, total, nil)
+				done++
+				if *workLimit != -1 && done >= *workLimit {
+					break
+				}
+			}
+		}()
+	}
+	wg.Wait()
+	u.Flush(ctx)
 }
 
 func processPlatesFromDB(ctx context.Context, d *db.DB) {
@@ -117,15 +211,20 @@ func processPlatesFromDB(ctx context.Context, d *db.DB) {
 				}
 				total, err := find.FindTotalOwed(plate, *state)
 				if err != nil {
-					if err := d.Update(ctx, plate, *state, db.ResultStateError, 0, err.Error()); err != nil {
-						log.Printf("error: %v", err)
-					}
+					log.Printf("thread #%3d: %s -> $%0.2f error: %v", i, plate, total, err)
+					go func() {
+						if err := d.Update(ctx, plate, *state, db.ResultStateError, 0, err.Error()); err != nil {
+							log.Printf("update error: %v", err)
+						}
+					}()
 					continue
 				}
-				log.Printf("%s -> $%0.2f", plate, total)
-				if err := d.Update(ctx, plate, *state, db.ResultStateDone, total, ""); err != nil {
-					log.Printf("error: %v", err)
-				}
+				log.Printf("thread #%3d: %s -> $%0.2f", i, plate, total)
+				go func() {
+					if err := d.Update(ctx, plate, *state, db.ResultStateDone, total, ""); err != nil {
+						log.Printf("update error: %v", err)
+					}
+				}()
 				done++
 				if *workLimit != -1 && done >= *workLimit {
 					break
@@ -137,7 +236,7 @@ func processPlatesFromDB(ctx context.Context, d *db.DB) {
 }
 
 func Main(ctx context.Context) {
-	d, err := db.MakeDB(ctx)
+	d, err := db.MakeFromFlags(ctx)
 	check.Err(err)
 
 	if *plates != "" {
@@ -150,5 +249,9 @@ func Main(ctx context.Context) {
 		return
 	}
 
-	processPlatesFromDB(ctx, d)
+	if *txSize > 0 {
+		processPlatesFromDBWithTransactions(ctx, d)
+	} else {
+		processPlatesFromDB(ctx, d)
+	}
 }

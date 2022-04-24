@@ -10,14 +10,16 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/mongo/readconcern"
+	"go.mongodb.org/mongo-driver/mongo/writeconcern"
 )
 
-type resultState string
+type ResultState string
 
 const (
-	ResultsStateUnset resultState = "unset"
-	ResultStateError  resultState = "error"
-	ResultStateDone   resultState = "done"
+	ResultsStateUnset ResultState = "unset"
+	ResultStateError  ResultState = "error"
+	ResultStateDone   ResultState = "done"
 )
 
 type plate struct {
@@ -26,7 +28,7 @@ type plate struct {
 }
 
 type storedResult struct {
-	State     resultState
+	State     ResultState
 	Error     string
 	TotalOwed float64
 }
@@ -34,6 +36,7 @@ type storedResult struct {
 type storedPlate struct {
 	Plate  plate
 	Result storedResult
+	Tag    string
 }
 
 func isNoDocs(err error) bool {
@@ -87,35 +90,6 @@ func (d *DB) CleanUp(ctx context.Context) error {
 	return nil
 }
 
-func (d *DB) AddWork(ctx context.Context, plateValue, state string) (bool, error) {
-	filter := bson.D{{"plate.value", plateValue}, {"plate.state", state}}
-	res := d.plates().FindOne(ctx, filter)
-	if res.Err() != nil {
-		if !isNoDocs(res.Err()) {
-			return false, res.Err()
-		}
-	} else {
-		// exists already
-		return true, nil
-	}
-
-	stored := storedPlate{
-		Plate: plate{
-			Value: plateValue,
-			State: state,
-		},
-		Result: storedResult{
-			State: ResultsStateUnset,
-		},
-	}
-
-	if _, err := d.plates().InsertOne(ctx, stored); err != nil {
-		return false, err
-	}
-
-	return false, nil
-}
-
 func (d *DB) GetWork(ctx context.Context, state string, num int) ([]string, bool, error) {
 	filter := bson.D{{"result.state", ResultsStateUnset}}
 	limit := int64(num)
@@ -145,7 +119,79 @@ func (d *DB) GetWork(ctx context.Context, state string, num int) ([]string, bool
 	return strs, true, nil
 }
 
-func (d *DB) Update(ctx context.Context, plateValue, state string, resultState resultState, total float64, resultErr string) error {
+func (d *DB) AddWork(ctx context.Context, plateValue, state, tag string) (bool, error) {
+	return d.addWork(ctx, plateValue, state, tag)
+}
+
+func (d *DB) addWork(ctx context.Context, plateValue, state, tag string) (bool, error) {
+	filter := bson.D{{"plate.value", plateValue}, {"plate.state", state}}
+	res := d.plates().FindOne(ctx, filter)
+	if res.Err() != nil {
+		if !isNoDocs(res.Err()) {
+			return false, res.Err()
+		}
+	} else {
+		// exists already
+		return true, nil
+	}
+
+	stored := storedPlate{
+		Plate: plate{
+			Value: plateValue,
+			State: state,
+		},
+		Tag: tag,
+		Result: storedResult{
+			State: ResultsStateUnset,
+		},
+	}
+
+	if _, err := d.plates().InsertOne(ctx, stored); err != nil {
+		return false, err
+	}
+
+	return false, nil
+}
+
+type Add struct {
+	Plate string
+	State string
+	Tag   string
+}
+
+// https://www.mongodb.com/developer/quickstart/golang-multi-document-acid-transactions/
+func (d *DB) AddWorkMany(ctx context.Context, adds []Add) error {
+	session, err := d.client.StartSession()
+	if err != nil {
+		return err
+	}
+	defer session.EndSession(ctx)
+
+	wc := writeconcern.New(writeconcern.WMajority())
+	rc := readconcern.Snapshot()
+	txnOpts := options.Transaction().SetWriteConcern(wc).SetReadConcern(rc)
+
+	if err = mongo.WithSession(ctx, session, func(sessionContext mongo.SessionContext) error {
+		if err = session.StartTransaction(txnOpts); err != nil {
+			return err
+		}
+		for _, a := range adds {
+			if _, err := d.addWork(ctx, a.Plate, a.State, a.Tag); err != nil {
+				return err
+			}
+		}
+		return nil
+	}); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (d *DB) Update(ctx context.Context, plateValue, state string, resultState ResultState, total float64, resultErr string) error {
+	return d.update(ctx, plateValue, state, resultState, total, resultErr)
+}
+
+func (d *DB) update(ctx context.Context, plateValue, state string, resultState ResultState, total float64, resultErr string) error {
 	filter := bson.D{{"plate.value", plateValue}, {"plate.state", state}}
 	result := storedResult{
 		State:     resultState,
@@ -158,6 +204,42 @@ func (d *DB) Update(ctx context.Context, plateValue, state string, resultState r
 		}},
 	}
 	if _, err := d.plates().UpdateOne(ctx, filter, update); err != nil {
+		return err
+	}
+	return nil
+}
+
+type Update struct {
+	Plate       string
+	State       string
+	ResultState ResultState
+	Total       float64
+	Error       string
+}
+
+// https://www.mongodb.com/developer/quickstart/golang-multi-document-acid-transactions/
+func (d *DB) UpdateMany(ctx context.Context, updates []Update) error {
+	session, err := d.client.StartSession()
+	if err != nil {
+		return err
+	}
+	defer session.EndSession(ctx)
+
+	wc := writeconcern.New(writeconcern.WMajority())
+	rc := readconcern.Snapshot()
+	txnOpts := options.Transaction().SetWriteConcern(wc).SetReadConcern(rc)
+
+	if err = mongo.WithSession(ctx, session, func(sessionContext mongo.SessionContext) error {
+		if err = session.StartTransaction(txnOpts); err != nil {
+			return err
+		}
+		for _, u := range updates {
+			if err := d.update(ctx, u.Plate, u.State, u.ResultState, u.Total, u.Error); err != nil {
+				return err
+			}
+		}
+		return nil
+	}); err != nil {
 		return err
 	}
 	return nil
