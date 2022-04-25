@@ -1,0 +1,7 @@
+
+use('nycparkingviolations');
+
+db.plates.deleteMany({ "result.state": "unset" });
+
+db.plates.aggregate({ $match: { "result.state": { $eq: "unset" } } });
+

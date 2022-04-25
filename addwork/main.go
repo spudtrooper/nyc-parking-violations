@@ -4,17 +4,14 @@ import (
 	"context"
 	"encoding/csv"
 	"flag"
-	"fmt"
 	"io"
 	"os"
 	"sync"
-	"sync/atomic"
-	"time"
 	"unicode"
 
-	"github.com/fatih/color"
 	"github.com/spudtrooper/goutil/check"
 	goutillog "github.com/spudtrooper/goutil/log"
+	"github.com/spudtrooper/nyc-parking-violations/common"
 	"github.com/spudtrooper/nyc-parking-violations/db"
 )
 
@@ -70,86 +67,9 @@ func addToStrings(i int, rngs []*strRange, buf []rune, ch *chan string) {
 	}
 }
 
-type transactionAdder struct {
-	d               *db.DB
-	mu              sync.Mutex
-	adds            []db.Add
-	transactionSize int
-}
-
-func makeTransactionAdder(d *db.DB) *transactionAdder {
-	return &transactionAdder{
-		d:               d,
-		transactionSize: *txSize,
-	}
-}
-
-func (t *transactionAdder) Add(ctx context.Context, plate, state, tag string) {
-	add := db.Add{
-		Plate: plate,
-		State: state,
-		Tag:   tag,
-	}
-	t.mu.Lock()
-	t.adds = append(t.adds, add)
-
-	var adds []db.Add
-	if len(t.adds) == t.transactionSize {
-		adds = t.adds[:]
-		t.adds = []db.Add{}
-	}
-	t.mu.Unlock()
-
-	if len(adds) > 0 {
-		t.flush(ctx, adds)
-	}
-}
-
-func (t *transactionAdder) Flush(ctx context.Context) {
-	t.mu.Lock()
-	defer t.mu.Unlock()
-	t.flush(ctx, t.adds)
-}
-
-func (t *transactionAdder) flush(ctx context.Context, adds []db.Add) {
-	if err := t.d.AddWorkMany(ctx, adds); err != nil {
-		log.Printf("error: %v", err)
-	}
-}
-
-func addFromFileBatched(ctx context.Context, d *db.DB, f string, colIndex int, skipFirst bool) {
-	t := makeTransactionAdder(d)
-	addFromFileGeneric(ctx, d, f, colIndex, skipFirst,
-		func(ctx context.Context, plate, state, tag string, existed, added *int64) {
-			t.Add(ctx, plate, state, tag)
-			atomic.AddInt64(added, 1)
-		},
-		func(ctx context.Context) {
-			t.Flush(ctx)
-		},
-	)
-}
-
-func addFromFile(ctx context.Context, d *db.DB, f string, colIndex int, skipFirst bool) {
-	addFromFileGeneric(ctx, d, f, colIndex, skipFirst,
-		func(ctx context.Context, plate, state, tag string, existed, added *int64) {
-			exists, err := d.AddWork(ctx, plate, state, tag)
-			check.Err(err)
-			if exists {
-				atomic.AddInt64(existed, 1)
-			} else {
-				atomic.AddInt64(added, 1)
-			}
-		},
-		func(ctx context.Context) {
-			// nothing
-		},
-	)
-}
-
-func addFromFileGeneric(ctx context.Context, d *db.DB, f string, colIndex int, skipFirst bool,
-	add func(ctx context.Context, plate, state, tag string, existed, added *int64), flush func(ctx context.Context)) {
+func makePlatesChannel(f string, skipFirst bool, colIndex int, existing map[string]bool) (chan string, chan error) {
 	platesCh := make(chan string)
+	errs := make(chan error)
 	go func() {
 		in, err := os.Open(f)
 		check.Err(err)
@@ -161,65 +81,60 @@ func addFromFileGeneric(ctx context.Context, d *db.DB, f string, colIndex int, s
 			if err == io.EOF {
 				break
 			}
-			check.Err(err)
+			if err != nil {
+				errs <- err
+				continue
+			}
 			if skipFirst && first {
 				first = false
 				continue
 			}
 			first = false
-			platesCh <- rec[colIndex]
+			plate := rec[colIndex]
+			if !existing[plate] {
+				platesCh <- rec[colIndex]
+			}
 		}
 		close(platesCh)
+		close(errs)
 	}()
+	return platesCh, errs
+}
 
-	var wg sync.WaitGroup
-	var added, existed int64
-	var done int32
-	for i := 0; i < *threads; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			for plate := range platesCh {
-				if *dryRun {
-					log.Printf("add %s:%s", plate, *state)
-					atomic.AddInt64(&added, 1)
-				} else {
-					add(ctx, plate, *state, *tag, &existed, &added)
-				}
-			}
-			atomic.AddInt32(&done, 1)
-		}()
+func addFromFile(ctx context.Context, d *db.DB, f string, colIndex int, skipFirst bool) {
+	existingCh, errs, err := d.FindDonePlatesForState(ctx, *state)
+	check.Err(err)
+	existing := map[string]bool{}
+	for p := range existingCh {
+		existing[p] = true
+	}
+	for e := range errs {
+		log.Printf("error: %v", e)
 	}
 
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		start := time.Now()
-		var lastAdded, lastExisted int64
-		for {
-			time.Sleep(1 * time.Second)
-			elapsed := time.Since(start)
-			rate := float64(added+existed) / float64(elapsed.Milliseconds()/1000)
-			diffAdded := added - lastAdded
-			diffExisted := existed - lastExisted
-			log.Printf("elapsed: %s | added: %5d (+%s) | existed: %5d (+%s) | rate: %0.1f/s",
-				color.GreenString(fmt.Sprintf("%20v", elapsed)),
-				added,
-				color.HiGreenString(fmt.Sprintf("%5d", diffAdded)),
-				existed,
-				color.HiGreenString(fmt.Sprintf("%5d", diffExisted)),
-				rate)
-			lastAdded = added
-			lastExisted = existed
-			if done > 0 {
-				break
-			}
+	log.Printf("have %d existing done plates", len(existing))
+
+	platesCh, _ := makePlatesChannel(f, skipFirst, colIndex, existing)
+	var adds []db.Add
+	for p := range platesCh {
+		add := db.Add{
+			Plate: p,
+			State: *state,
+			Tag:   *tag,
 		}
+		adds = append(adds, add)
+	}
+	log.Printf("adding %d new plates", len(adds))
+
+	go func() {
+		common.MonitorDBInLoop(ctx, d)
 	}()
 
-	wg.Wait()
-
-	flush(ctx)
+	if err := d.AddWorkManyNoExistingCheck(ctx, adds); err != nil {
+		log.Printf("error: %v", err)
+	}
+	dbg, _ := d.MustDebugString(ctx)
+	log.Printf("done: %s", dbg)
 }
 
 func createStrings() chan string {
@@ -263,21 +178,13 @@ func Main(ctx context.Context) {
 	check.Err(err)
 
 	if *platesFile != "" {
-		if *txSize > 0 {
-			addFromFileBatched(ctx, d, *platesFile, 0, false)
-		} else {
-			addFromFile(ctx, d, *platesFile, 0, false)
-		}
+		addFromFile(ctx, d, *platesFile, 0, false)
 		return
 	}
 
 	if *plateCSVFile != "" {
 		check.Check(*plateCSVFileColumn != -1)
-		if *txSize > 0 {
-			addFromFileBatched(ctx, d, *plateCSVFile, *plateCSVFileColumn, *plateCSVSkipFirst)
-		} else {
-			addFromFile(ctx, d, *plateCSVFile, *plateCSVFileColumn, *plateCSVSkipFirst)
-		}
+		addFromFile(ctx, d, *plateCSVFile, *plateCSVFileColumn, *plateCSVSkipFirst)
 		return
 	}
 

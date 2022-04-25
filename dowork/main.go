@@ -10,6 +10,7 @@ import (
 	goutillog "github.com/spudtrooper/goutil/log"
 	"github.com/spudtrooper/goutil/must"
 	"github.com/spudtrooper/goutil/slice"
+	"github.com/spudtrooper/nyc-parking-violations/common"
 	"github.com/spudtrooper/nyc-parking-violations/db"
 	"github.com/spudtrooper/nyc-parking-violations/find"
 )
@@ -21,6 +22,7 @@ var (
 	plates     = flag.String("plates", "", "comma-delimited list of plates to look up")
 	platesFile = flag.String("plates_file", "", "CVS containing one plate value per line")
 	txSize     = flag.Int("tx_size", 0, "# of updates per transaction, if zero we don't use the batch updater")
+	verbose    = flag.Bool("verbose", false, "verbose logging")
 )
 
 var log = goutillog.MakeLog("plates", goutillog.MakeLogColor(true))
@@ -211,7 +213,9 @@ func processPlatesFromDB(ctx context.Context, d *db.DB) {
 				}
 				total, err := find.FindTotalOwed(plate, *state)
 				if err != nil {
-					log.Printf("thread #%3d: %s -> $%0.2f error: %v", i, plate, total, err)
+					if *verbose {
+						log.Printf("thread #%3d: %s -> $%0.2f error: %v", i, plate, total, err)
+					}
 					go func() {
 						if err := d.Update(ctx, plate, *state, db.ResultStateError, 0, err.Error()); err != nil {
 							log.Printf("update error: %v", err)
@@ -219,7 +223,9 @@ func processPlatesFromDB(ctx context.Context, d *db.DB) {
 					}()
 					continue
 				}
-				log.Printf("thread #%3d: %s -> $%0.2f", i, plate, total)
+				if *verbose {
+					log.Printf("thread #%3d: %s -> $%0.2f", i, plate, total)
+				}
 				go func() {
 					if err := d.Update(ctx, plate, *state, db.ResultStateDone, total, ""); err != nil {
 						log.Printf("update error: %v", err)
@@ -232,6 +238,11 @@ func processPlatesFromDB(ctx context.Context, d *db.DB) {
 			}
 		}()
 	}
+
+	go func() {
+		common.MonitorDBInLoop(ctx, d)
+	}()
+
 	wg.Wait()
 }
 
