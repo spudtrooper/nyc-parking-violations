@@ -12,3 +12,4 @@ cat playgrounds/vanity_convert_to_csv.mongodb | sed 's#use(#//use(#g' > tmp/scri
 mongo mongodb://localhost:27017/nycparkingviolations tmp/scripts/vanity_convert_to_csv.js
 mongoexport --db=nycparkingviolations --collection=vanityconverttocsv --type=csv --fields=$fields > $out
 echo "Written to $out $(wc -l $out | awk '{print $1}' | sed 's/ //g') lines"
+cp $out ~/Desktop

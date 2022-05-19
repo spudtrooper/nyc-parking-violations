@@ -8,7 +8,7 @@ import (
 )
 
 func Main(ctx context.Context) {
-	d, err := db.MakeDB(ctx)
+	d, err := db.Make(ctx)
 	check.Err(err)
 	check.Err(d.CleanUp(ctx))
 }
